@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Judicial Constraints vs Democracy Level</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f5ff;
+            color: #1a1a2e;
+            line-height: 1.6;
+        }
+        .tooltip {
+            position: absolute;
+            padding: 12px 16px;
+            background: rgba(25, 55, 109, 0.95);
+            color: white;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 240px;
+            line-height: 1.5;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .chart-container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            overflow: visible;
+            background-color: white;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(48, 93, 175, 0.08);
+            border: 1px solid rgba(48, 93, 175, 0.05);
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #1a56db;
+            font-weight: 700;
+            font-size: 28px;
+        }
+        .axis-line {
+            stroke: #d0d9f0;
+            stroke-width: 1px;
+        }
+        .grid line {
+            stroke: #e6eeff;
+            stroke-opacity: 0.8;
+            shape-rendering: crispEdges;
+        }
+        .grid path {
+            stroke-width: 0;
+        }
+        .domain {
+            stroke: #a8b9e2;
+            stroke-width: 1.5px;
+        }
+        .tick text {
+            font-size: 12px;
+            fill: #5d7aaf;
+            font-weight: 500;
+        }
+        .axis-title {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #1a56db;
+        }
+        .direction-indicator {
+            font-weight: bold;
+            font-size: 14px;
+            fill: #1a56db;
+        }
+        .sources {
+            margin-top: 24px;
+            font-size: 13px;
+            color: #5d7aaf;
+            text-align: center;
+            line-height: 1.5;
+        }
+        .sources a {
+            color: #1a56db;
+            text-decoration: none;
+            transition: color 0.2s;
+            font-weight: 500;
+        }
+        .sources a:hover {
+            color: #0e3fa9;
+            text-decoration: underline;
+        }
+        .data-table {
+            margin-top: 36px;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(48, 93, 175, 0.05);
+            border: 1px solid #e6eeff;
+        }
+        .data-table th {
+            background: #f5f9ff;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #1a56db;
+            border-bottom: 2px solid #d0d9f0;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: background 0.2s;
+        }
+        .data-table th:hover {
+            background: #e6eeff;
+        }
+        .data-table th::after {
+            content: "↕";
+            position: absolute;
+            right: 8px;
+            opacity: 0.5;
+        }
+        .data-table th.asc::after {
+            content: "↑";
+            opacity: 1;
+        }
+        .data-table th.desc::after {
+            content: "↓";
+            opacity: 1;
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e6eeff;
+            color: #334977;
+        }
+        .data-table tr:hover {
+            background-color: #f5f9ff;
+        }
+        .data-table tr.israel {
+            background-color: #e6f0ff;
+            font-weight: 600;
+        }
+        .data-table tr.israel:hover {
+            background-color: #d0e6ff;
+        }
+        .data-table tr.israel td:first-child {
+            font-size: 16px;
+            color: #1a56db;
+        }
+        .data-table tr.israel td:first-child::before {
+            content: "★ ";
+            color: #1a56db;
+        }
+        .data-point {
+            cursor: pointer;
+        }
+        .point-group {
+            transition: all 0.2s ease;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 0.9; }
+            100% { opacity: 0.5; }
+        }
+        .point-group.israel .point-bg {
+            animation: pulse 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <h1>Judicial Constraints vs Democracy Level</h1>
+        <div id="chart"></div>
+        <div id="data-table"></div>
+    </div>
+
+    <script>
+        // Country name mapping to handle differences between the datasets
+        const countryNameMapping = {
+            // Map country names that differ between the two datasets
+            "Czechia": "Czech Republic",
+            "Cote d'Ivoire": "Côte d'Ivoire",
+            "East Timor": "Timor-Leste",
+            "Laos": "Lao PDR",
+            "South Korea": "Korea, Rep.",
+            "North Korea": "Korea, Dem. Rep.",
+            "Eswatini": "Eswatini",
+            "Congo": "Congo, Rep.",
+            "Democratic Republic of Congo": "Congo, Dem. Rep.",
+            "Cape Verde": "Cape Verde",
+            "Turkey": "Türkiye",
+            "Sao Tome and Principe": "São Tomé and Principe"
+        };
+
+        // Country to flag emoji mapping
+        const countryToFlag = {
+            "Afghanistan": "🇦🇫", "Albania": "🇦🇱", "Algeria": "🇩🇿", "Andorra": "🇦🇩", "Angola": "🇦🇴", 
+            "Antigua and Barbuda": "🇦🇬", "Argentina": "🇦🇷", "Armenia": "🇦🇲", "Australia": "🇦🇺", 
+            "Austria": "🇦🇹", "Azerbaijan": "🇦🇿", "Bahamas": "🇧🇸", "Bahrain": "🇧🇭", "Bangladesh": "🇧🇩", 
+            "Barbados": "🇧🇧", "Belarus": "🇧🇾", "Belgium": "🇧🇪", "Belize": "🇧🇿", "Benin": "🇧🇯", 
+            "Bhutan": "🇧🇹", "Bolivia": "🇧🇴", "Bosnia and Herzegovina": "🇧🇦", "Botswana": "🇧🇼", 
+            "Brazil": "🇧🇷", "Brunei": "🇧🇳", "Bulgaria": "🇧🇬", "Burkina Faso": "🇧🇫", "Burundi": "🇧🇮", 
+            "Cambodia": "🇰🇭", "Cameroon": "🇨🇲", "Canada": "🇨🇦", "Cape Verde": "🇨🇻", 
+            "Central African Republic": "🇨🇫", "Chad": "🇹🇩", "Chile": "🇨🇱", "China": "🇨🇳", 
+            "Colombia": "🇨🇴", "Comoros": "🇰🇲", "Congo": "🇨🇬", "Democratic Republic of Congo": "🇨🇩", 
+            "Costa Rica": "🇨🇷", "Cote d'Ivoire": "🇨🇮", "Croatia": "🇭🇷", "Cuba": "🇨🇺", "Cyprus": "🇨🇾", 
+            "Czech Republic": "🇨🇿", "Czechia": "🇨🇿", "Denmark": "🇩🇰", "Djibouti": "🇩🇯", "Dominica": "🇩🇲", 
+            "Dominican Republic": "🇩🇴", "Ecuador": "🇪🇨", "Egypt": "🇪🇬", "El Salvador": "🇸🇻", 
+            "Equatorial Guinea": "🇬🇶", "Eritrea": "🇪🇷", "Estonia": "🇪🇪", "Eswatini": "🇸🇿", 
+            "Ethiopia": "🇪🇹", "Fiji": "🇫🇯", "Finland": "🇫🇮", "France": "🇫🇷", "Gabon": "🇬🇦", 
+            "Gambia": "🇬🇲", "Georgia": "🇬🇪", "Germany": "🇩🇪", "Ghana": "🇬🇭", "Greece": "🇬🇷", 
+            "Grenada": "🇬🇩", "Guatemala": "🇬🇹", "Guinea": "🇬🇳", "Guinea-Bissau": "🇬🇼", "Guyana": "🇬🇾", 
+            "Haiti": "🇭🇹", "Honduras": "🇭🇳", "Hungary": "🇭🇺", "Iceland": "🇮🇸", "India": "🇮🇳", 
+            "Indonesia": "🇮🇩", "Iran": "🇮🇷", "Iraq": "🇮🇶", "Ireland": "🇮🇪", "Israel": "🇮🇱", 
+            "Italy": "🇮🇹", "Jamaica": "🇯🇲", "Japan": "🇯🇵", "Jordan": "🇯🇴", "Kazakhstan": "🇰🇿", 
+            "Kenya": "🇰🇪", "Kiribati": "🇰🇮", "Kosovo": "🇽🇰", "Kuwait": "🇰🇼", "Kyrgyzstan": "🇰🇬", 
+            "Laos": "🇱🇦", "Latvia": "🇱🇻", "Lebanon": "🇱🇧", "Lesotho": "🇱🇸", "Liberia": "🇱🇷", 
+            "Libya": "🇱🇾", "Liechtenstein": "🇱🇮", "Lithuania": "🇱🇹", "Luxembourg": "🇱🇺", 
+            "Madagascar": "🇲🇬", "Malawi": "🇲🇼", "Malaysia": "🇲🇾", "Maldives": "🇲🇻", "Mali": "🇲🇱", 
+            "Malta": "🇲🇹", "Marshall Islands": "🇲🇭", "Mauritania": "🇲🇷", "Mauritius": "🇲🇺", 
+            "Mexico": "🇲🇽", "Micronesia": "🇫🇲", "Moldova": "🇲🇩", "Monaco": "🇲🇨", "Mongolia": "🇲🇳", 
+            "Montenegro": "🇲🇪", "Morocco": "🇲🇦", "Mozambique": "🇲🇿", "Myanmar": "🇲🇲", 
+            "Namibia": "🇳🇦", "Nauru": "🇳🇷", "Nepal": "🇳🇵", "Netherlands": "🇳🇱", "New Zealand": "🇳🇿", 
+            "Nicaragua": "🇳🇮", "Niger": "🇳🇪", "Nigeria": "🇳🇬", "North Korea": "🇰🇵", 
+            "North Macedonia": "🇲🇰", "Norway": "🇳🇴", "Oman": "🇴🇲", "Pakistan": "🇵🇰", "Palau": "🇵🇼", 
+            "Panama": "🇵🇦", "Papua New Guinea": "🇵🇬", "Paraguay": "🇵🇾", "Peru": "🇵🇪", 
+            "Philippines": "🇵🇭", "Poland": "🇵🇱", "Portugal": "🇵🇹", "Qatar": "🇶🇦", "Romania": "🇷🇴", 
+            "Russia": "🇷🇺", "Rwanda": "🇷🇼", "Saint Kitts and Nevis": "🇰🇳", "Saint Lucia": "🇱🇨", 
+            "Saint Vincent and the Grenadines": "🇻🇨", "Samoa": "🇼🇸", "San Marino": "🇸🇲", 
+            "Sao Tome and Principe": "🇸🇹", "Saudi Arabia": "🇸🇦", "Senegal": "🇸🇳", "Serbia": "🇷🇸", 
+            "Seychelles": "🇸🇨", "Sierra Leone": "🇸🇱", "Singapore": "🇸🇬", "Slovakia": "🇸🇰", 
+            "Slovenia": "🇸🇮", "Solomon Islands": "🇸🇧", "Somalia": "🇸🇴", "South Africa": "🇿🇦", 
+            "South Korea": "🇰🇷", "South Sudan": "🇸🇸", "Spain": "🇪🇸", "Sri Lanka": "🇱🇰", "Sudan": "🇸🇩", 
+            "Suriname": "🇸🇷", "Sweden": "🇸🇪", "Switzerland": "🇨🇭", "Syria": "🇸🇾", "Taiwan": "🇹🇼", 
+            "Tajikistan": "🇹🇯", "Tanzania": "🇹🇿", "Thailand": "🇹🇭", "Timor-Leste": "🇹🇱", 
+            "East Timor": "🇹🇱", "Togo": "🇹🇬", "Tonga": "🇹🇴", "Trinidad and Tobago": "🇹🇹", 
+            "Tunisia": "🇹🇳", "Turkey": "🇹🇷", "Türkiye": "🇹🇷", "Turkmenistan": "🇹🇲", "Tuvalu": "🇹🇻", 
+            "Uganda": "🇺🇬", "Ukraine": "🇺🇦", "United Arab Emirates": "🇦🇪", "United Kingdom": "🇬🇧", 
+            "United States": "🇺🇸", "Uruguay": "🇺🇾", "Uzbekistan": "🇺🇿", "Vanuatu": "🇻🇺", 
+            "Vatican City": "🇻🇦", "Venezuela": "🇻🇪", "Vietnam": "🇻🇳", "Yemen": "🇾🇪", "Zambia": "🇿🇲", 
+            "Zimbabwe": "🇿🇼"
+        };
+
+        // Create a responsive chart that updates on window resize
+        let chart;
+        
+        // Function to create or update the chart
+        function createChart(data) {
+            // Clear any existing chart
+            d3.select("#chart").html("");
+            
+            if (data.length === 0) return;
+            
+            // Set up the SVG dimensions - make it responsive to container width
+            const margin = {top: 40, right: 30, bottom: 60, left: 60};
+            const containerWidth = document.querySelector('.chart-container').clientWidth - 64; // Account for container padding
+            const width = containerWidth - margin.left - margin.right;
+            const height = Math.min(600, width * 0.75) - margin.top - margin.bottom; // Maintain aspect ratio
+
+            // Create the SVG element with responsive width
+            const svg = d3.select("#chart")
+                .append("svg")
+                .attr("width", "100%") // Use 100% width instead of fixed
+                .attr("height", height + margin.top + margin.bottom)
+                .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Add a subtle background rectangle
+            svg.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("fill", "#f5f9ff")
+                .attr("rx", 8); // rounded corners
+
+            // Set up scales
+            const xScale = d3.scaleLinear()
+                .domain([0, 1])  // Judicial constraints are between 0 and 1
+                .range([0, width])
+                .nice();
+
+            const yScale = d3.scaleLinear()
+                .domain([0, 10])  // Democracy index is between 0 and 10
+                .range([height, 0])
+                .nice();
+
+            // Add grid lines
+            // Vertical grid lines
+            svg.append("g")
+                .attr("class", "grid")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale)
+                    .tickSize(-height)
+                    .tickFormat("")
+                );
+
+            // Horizontal grid lines
+            svg.append("g")
+                .attr("class", "grid")
+                .call(d3.axisLeft(yScale)
+                    .tickSize(-width)
+                    .tickFormat("")
+                );
+
+            // Add axes
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale))
+                .attr("class", "axis-line")
+                .append("text")
+                .attr("x", width / 2)
+                .attr("y", 45)
+                .attr("fill", "#1a56db")
+                .attr("font-size", "14px")
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "middle")
+                .attr("class", "axis-title")
+                .text("Judicial Constraints on the Executive");
+
+            svg.append("g")
+                .call(d3.axisLeft(yScale))
+                .attr("class", "axis-line")
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -45)
+                .attr("x", -height / 2)
+                .attr("fill", "#1a56db")
+                .attr("font-size", "14px")
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "middle")
+                .attr("class", "axis-title")
+                .text("Democracy Level");
+
+            // Add directional indicators for axes
+            // For X-axis (Judicial Constraints)
+            svg.append("text")
+                .attr("x", width - 10)
+                .attr("y", height - 30)  // Moved higher above X axis
+                .attr("text-anchor", "end")
+                .attr("class", "direction-indicator")
+                .text("More Judicial Constraints →");
+                
+            // Add source subtitle for X-axis
+            const xAxisSourceGroup = svg.append("g")
+                .attr("transform", `translate(${width - 10}, ${height - 15})`)
+                .style("cursor", "pointer")
+                .attr("text-anchor", "end")
+                .on("click", () => window.open("https://ourworldindata.org/grapher/judicial-constraints-on-the-executive-index", "_blank"));
+                
+            xAxisSourceGroup.append("text")
+                .attr("class", "source-subtitle")
+                .attr("fill", "#5d7aaf")
+                .attr("font-size", "11px")
+                .text("Source: Our World in Data")
+                .attr("text-decoration", "underline");
+
+            // For Y-axis (Democracy Level)
+            svg.append("text")
+                .attr("y", 15)
+                .attr("x", 10)  // Moved much closer to Y axis, still on right
+                .attr("text-anchor", "start")
+                .attr("class", "direction-indicator")
+                .text("More Democratic ↑");
+                
+            // Add source subtitle for Y-axis
+            const yAxisSourceGroup = svg.append("g")
+                .attr("transform", `translate(10, 30)`)
+                .style("cursor", "pointer")
+                .attr("text-anchor", "start")
+                .on("click", () => window.open("https://www.wikiwand.com/en/articles/The_Economist_Democracy_Index", "_blank"));
+                
+            yAxisSourceGroup.append("text")
+                .attr("class", "source-subtitle")
+                .attr("fill", "#5d7aaf")
+                .attr("font-size", "11px")
+                .text("Source: The Economist Intelligence Unit")
+                .attr("text-decoration", "underline");
+
+            // Create a tooltip
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+
+            // Add data points with background circles and flag emojis
+            // First create groups to hold both the circle and text
+            const pointGroups = svg.selectAll(".point-group")
+                .data(data)
+                .enter()
+                .append("g")
+                .attr("class", d => d.country === "Israel" ? "point-group israel" : "point-group")
+                .attr("transform", d => `translate(${xScale(d.judicialConstraint)}, ${yScale(d.democracyIndex)})`)
+                .style("cursor", "pointer");
+            
+            // Add background circles that will show/scale on hover
+            pointGroups.append("circle")
+                .attr("class", "point-bg")
+                .attr("r", d => d.country === "Israel" ? 15 : 10)
+                .attr("fill", d => d.country === "Israel" ? "#e6f0ff" : "#f0f5ff")
+                .attr("stroke", d => d.country === "Israel" ? "#0e3fa9" : "#2b6cb0")
+                .attr("stroke-width", d => d.country === "Israel" ? 2 : 1.5)
+                .attr("opacity", d => d.country === "Israel" ? 0.8 : 0)
+                .style("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.05))");
+            
+            // Add flag emojis
+            pointGroups.append("text")
+                .attr("class", "data-point")
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em") // Vertical alignment
+                .attr("fill", d => d.country === "Israel" ? "#1a56db" : "#4299e1")
+                .attr("font-size", d => d.country === "Israel" ? "24px" : "14px")
+                .attr("font-weight", "bold")
+                .text(d => countryToFlag[d.country] || "🏳️");
+            
+            // Add interactivity to the groups
+            pointGroups
+                .on("mouseover", function(event, d) {
+                    // Scale up the background circle
+                    d3.select(this).select("circle")
+                        .transition()
+                        .duration(200)
+                        .attr("r", d => d.country === "Israel" ? 20 : 14)
+                        .attr("opacity", d => d.country === "Israel" ? 0.9 : 0.7)
+                        .style("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.15))");
+                    
+                    // Show tooltip
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0.95);
+                    
+                    let tooltipText = `<strong>${d.country}</strong> ${countryToFlag[d.country] || ""}<br>`;
+                    tooltipText += `Democracy Index: <strong>${d.democracyIndex.toFixed(2)}</strong><br>`;
+                    tooltipText += `Judicial Constraints: <strong>${d.judicialConstraint.toFixed(2)}</strong>`;
+                    
+                    tooltip.html(tooltipText)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(event, d) {
+                    // Scale down the background circle
+                    d3.select(this).select("circle")
+                        .transition()
+                        .duration(500)
+                        .attr("r", d => d.country === "Israel" ? 15 : 10)
+                        .attr("opacity", d => d.country === "Israel" ? 0.8 : 0)
+                        .style("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.05))");
+                    
+                    // Hide tooltip
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // Add a subtle border to the chart area
+            svg.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("fill", "none")
+                .attr("stroke", "#d0d9f0")
+                .attr("stroke-width", 1)
+                .attr("rx", 8)
+                .attr("pointer-events", "none");
+                
+            // Create and populate the data table
+            renderTable(data);
+        }
+        
+        // Function to load and process the data
+        async function loadData() {
+            try {
+                console.log("Starting to load CSV files...");
+                
+                // Log the files we're trying to load
+                console.log("Attempting to load democracy data from:", "Untitled spreadsheet - Sheet2 (1).csv");
+                console.log("Attempting to load judicial data from:", "judicial-constraints-on-the-executive-index.csv");
+                
+                // Load both CSV files
+                const [democracyData, judicialData] = await Promise.all([
+                    d3.csv("Untitled spreadsheet - Sheet2 (1).csv")
+                        .catch(error => {
+                            console.error("Error loading democracy data:", error);
+                            document.getElementById("chart").innerHTML = 
+                                "<p>Error loading democracy data from 'Untitled spreadsheet - Sheet2 (1).csv'. " +
+                                "Please make sure the file exists in the same directory.</p>";
+                            return [];
+                        }),
+                    d3.csv("judicial-constraints-on-the-executive-index.csv")
+                        .catch(error => {
+                            console.error("Error loading judicial data:", error);
+                            document.getElementById("chart").innerHTML = 
+                                "<p>Error loading judicial constraints data from 'judicial-constraints-on-the-executive-index.csv'. " +
+                                "Please make sure the file exists in the same directory.</p>";
+                            return [];
+                        })
+                ]);
+                
+                console.log("CSV loading complete. Democracy data rows:", democracyData.length);
+                console.log("CSV loading complete. Judicial data rows:", judicialData.length);
+                
+                if (!democracyData.length || !judicialData.length) {
+                    throw new Error("One or both datasets are empty");
+                }
+
+                // Process democracy data
+                const processedDemocracyData = democracyData.map(d => {
+                    return {
+                        country: d.countryname,
+                        democracyIndex: parseFloat(d["Democracy index"])
+                    };
+                }).filter(d => !isNaN(d.democracyIndex));
+
+                // Create a merged dataset
+                const mergedData = [];
+                
+                judicialData.forEach(jd => {
+                    const judicialConstraint = parseFloat(jd["Judicial constraints on the executive index (best estimate)"]);
+                    
+                    // Try to find a match in the democracy data
+                    let countryName = jd.Entity;
+                    // Check if the country name needs to be mapped
+                    const mappedName = countryNameMapping[countryName];
+                    
+                    // Try with original name first, then with mapped name if available
+                    let democracyMatch = processedDemocracyData.find(d => d.country === countryName);
+                    
+                    if (!democracyMatch && mappedName) {
+                        democracyMatch = processedDemocracyData.find(d => d.country === mappedName);
+                    }
+                    
+                    if (democracyMatch) {
+                        mergedData.push({
+                            country: countryName,
+                            judicialConstraint: judicialConstraint,
+                            democracyIndex: democracyMatch.democracyIndex
+                        });
+                    }
+                });
+
+                return mergedData;
+            } catch (error) {
+                console.error("Error loading or processing data:", error);
+                document.getElementById("chart").innerHTML = "<p>Error loading data. Please make sure the CSV files exist.</p>";
+                return [];
+            }
+        }
+
+        // Create and populate the data table
+        let currentSortColumn = null;
+        let currentSortOrder = "asc";
+        
+        function renderTable(sortedData) {
+            // Clear existing table
+            d3.select("#data-table").html("");
+            
+            const table = d3.select("#data-table")
+                .append("table")
+                .attr("class", "data-table");
+            
+            // Add table header
+            const thead = table.append("thead").append("tr");
+            
+            const columns = ["Country", "Democracy Index", "Judicial Constraints"];
+            
+            thead.selectAll("th")
+                .data(columns)
+                .enter()
+                .append("th")
+                .text(d => d)
+                .attr("class", d => {
+                    if (d === currentSortColumn) {
+                        return currentSortOrder;
+                    }
+                    return "";
+                })
+                .on("click", function(event, d) {
+                    if (d === currentSortColumn) {
+                        currentSortOrder = currentSortOrder === "asc" ? "desc" : "asc";
+                    } else {
+                        currentSortColumn = d;
+                        currentSortOrder = "asc";
+                    }
+                    
+                    // Sort the data
+                    const sorted = [...sortedData].sort((a, b) => {
+                        let aVal, bVal;
+                        
+                        switch(d) {
+                            case "Country":
+                                aVal = a.country;
+                                bVal = b.country;
+                                break;
+                            case "Democracy Index":
+                                aVal = a.democracyIndex;
+                                bVal = b.democracyIndex;
+                                break;
+                            case "Judicial Constraints":
+                                aVal = a.judicialConstraint;
+                                bVal = b.judicialConstraint;
+                                break;
+                        }
+                        
+                        if (currentSortOrder === "asc") {
+                            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+                        } else {
+                            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+                        }
+                    });
+                    
+                    renderTable(sorted);
+                });
+            
+            // Add table body
+            const tbody = table.append("tbody");
+            
+            // Add table rows
+            tbody.selectAll("tr")
+                .data(sortedData)
+                .enter()
+                .append("tr")
+                .attr("class", d => d.country === "Israel" ? "israel" : "")
+                .selectAll("td")
+                .data(d => [
+                    `${countryToFlag[d.country] || ""} ${d.country}`,
+                    d.democracyIndex.toFixed(2),
+                    d.judicialConstraint.toFixed(2)
+                ])
+                .enter()
+                .append("td")
+                .text(d => d);
+        }
+
+        // Initialization
+        loadData().then(data => {
+            // Initial chart render
+            createChart(data);
+            
+            // Update chart on window resize
+            window.addEventListener('resize', function() {
+                // Debounce resize event
+                clearTimeout(chart);
+                chart = setTimeout(function() {
+                    createChart(data);
+                }, 250);
+            });
+        }).catch(error => {
+            console.error("Error creating chart:", error);
+            document.getElementById("chart").innerHTML = "<p>Error creating chart. Please check the console for details.</p>";
+        });
+    </script>
+</body>
+</html> 
